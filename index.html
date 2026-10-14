@@ -123,6 +123,10 @@ tr[data-status="complete"] .stripe{border-left-color:var(--done)}
 .field label{font-size:12px;font-weight:500;color:var(--muted)}
 .field input,.field select{border:1px solid var(--line-strong);background:var(--bg);border-radius:7px;padding:8px 10px;width:100%;min-width:0}
 .field input:focus,.field select:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--accent)}
+.picks{display:flex;flex-wrap:wrap;gap:6px;border:1px solid var(--line-strong);background:var(--bg);border-radius:7px;padding:8px 10px;min-height:38px}
+.pick{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px 3px 6px;cursor:pointer;font-size:13px;user-select:none}
+.pick input{accent-color:var(--accent);margin:0;width:14px;height:14px}
+.pick:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media (max-width:420px){.row2{grid-template-columns:1fr}}
 .dlg .foot{display:flex;gap:8px;justify-content:flex-end;margin-top:6px;flex-wrap:wrap}
@@ -212,7 +216,7 @@ tr[data-status="complete"] .stripe{border-left-color:var(--done)}
             <th class="sortable" data-k="title">Task<span class="arrow"></span></th>
             <th class="sortable" data-k="priority">Priority<span class="arrow"></span></th>
             <th class="sortable" data-k="due_date">Due date<span class="arrow"></span></th>
-            <th class="sortable" data-k="assignee">Assignee<span class="arrow"></span></th>
+            <th class="sortable" data-k="assignee">Assigned to<span class="arrow"></span></th>
             <th class="sortable" data-k="creator">Created by<span class="arrow"></span></th>
             <th>Note / link</th>
             <th class="sortable" data-k="days" style="text-align:center">Days open<span class="arrow"></span></th>
@@ -250,7 +254,7 @@ tr[data-status="complete"] .stripe{border-left-color:var(--done)}
     <h2><span id="dlgTitle">New Task</span><button class="ico x" type="button" id="dlgClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></h2>
     <div class="meta" id="dlgMeta" hidden></div>
     <div class="field"><label for="fTitle">Task name</label><input id="fTitle" required placeholder="e.g. Review Q4 budget"></div>
-    <div class="field"><label for="fAssignee">Assigned to</label><select id="fAssignee"></select></div>
+    <div class="field"><label>Assigned to <span style="font-weight:400">(pick one or more)</span></label><div class="picks" id="fAssignees"></div></div>
     <div class="row2">
       <div class="field"><label for="fStatus">Status</label><select id="fStatus"><option value="open">Open</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="complete">Complete</option></select></div>
       <div class="field"><label for="fPriority">Priority</label><select id="fPriority"><option value="normal">Normal</option><option value="urgent">Urgent</option></select></div>
@@ -382,7 +386,7 @@ function visibleTasks(){
     if (k==='due_date'){ va=a.due_date||'9999'; vb=b.due_date||'9999'; }
     else if (k==='status'){ va=order[a.status]; vb=order[b.status]; }
     else if (k==='priority'){ va=a.priority==='urgent'?0:1; vb=b.priority==='urgent'?0:1; }
-    else if (k==='assignee'){ va=memberName(a.assignee_email).toLowerCase(); vb=memberName(b.assignee_email).toLowerCase(); }
+    else if (k==='assignee'){ va=assigneeNames(a).toLowerCase(); vb=assigneeNames(b).toLowerCase(); }
     else if (k==='creator'){ va=memberName(a.created_by_email).toLowerCase(); vb=memberName(b.created_by_email).toLowerCase(); }
     else if (k==='days'){ va=daysOpen(a); vb=daysOpen(b); }
     else { va=(a.title||'').toLowerCase(); vb=(b.title||'').toLowerCase(); }
@@ -428,7 +432,7 @@ function render(){
       +'<td class="task">'+esc(t.title)+'</td>'
       +'<td><span class="pill '+t.priority+'">'+(t.priority==='urgent'?'Urgent':'Normal')+'</span></td>'
       +'<td class="due'+(overdue?' overdue':'')+'">'+fmtDate(t.due_date)+(overdue?'<span class="tag">overdue</span>':'')+'</td>'
-      +'<td>'+esc(memberName(t.assignee_email))+(t.assignee_email===state.me.email?'<span class="you">you</span>':'')+'</td>'
+      +'<td>'+esc(assigneeNames(t))+(assignedToMe(t)?'<span class="you">you</span>':'')+'</td>'
       +'<td style="color:var(--muted)">'+esc(memberName(t.created_by_email))+(t.created_by_email===state.me.email?'<span class="you">you</span>':'')+'</td>'
       +'<td class="note" title="'+esc(t.note||'')+'">'+note+'</td>'
       +'<td class="num">'+daysOpen(t)+'</td>'
@@ -464,10 +468,13 @@ $('confirmYes').addEventListener('click', function(){
 
 /* ---------- DIALOG ---------- */
 function fillAssignees(sel){
-  var opts = state.members.filter(function(m){return m.active;}).map(function(m){ return '<option value="'+esc(m.email)+'">'+esc(m.name)+(m.email===state.me.email?' (you)':'')+'</option>'; });
-  $('fAssignee').innerHTML = '<option value="">Unassigned</option>'+opts.join('');
-  $('fAssignee').value = sel||'';
+  sel = sel||[];
+  $('fAssignees').innerHTML = state.members.filter(function(m){return m.active || sel.indexOf(m.email)>=0;}).map(function(m){
+    return '<label class="pick"><input type="checkbox" value="'+esc(m.email)+'"'+(sel.indexOf(m.email)>=0?' checked':'')+'> '+esc(m.name)+(m.email===state.me.email?' (you)':'')+'</label>'; }).join('');
 }
+function pickedAssignees(){ return Array.prototype.map.call($('fAssignees').querySelectorAll('input:checked'), function(i){ return i.value; }); }
+function assigneeNames(t){ var a=t.assignees||[]; return a.length ? a.map(memberName).join(', ') : '—'; }
+function assignedToMe(t){ return (t.assignees||[]).indexOf(state.me.email)>=0; }
 function openDialog(t){
   state.editing = t||null;
   $('dlgErr').hidden=true;
@@ -475,7 +482,7 @@ function openDialog(t){
   $('dlgSave').textContent = t ? 'Save changes' : 'Add task';
   $('dlgDelete').hidden = !(t && canDelete(t));
   $('fTitle').value = t ? t.title : '';
-  fillAssignees(t ? t.assignee_email : state.me.email);
+  fillAssignees(t ? t.assignees : [state.me.email]);
   $('fStatus').value = t ? t.status : 'open';
   $('fPriority').value = t ? t.priority : 'normal';
   $('fDue').value = t && t.due_date ? t.due_date : '';
@@ -492,7 +499,7 @@ document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeDia
 $('dlgDelete').addEventListener('click', function(){ if(state.editing) askDelete(state.editing); });
 $('taskForm').addEventListener('submit', function(e){
   e.preventDefault();
-  var payload = { title:$('fTitle').value.trim(), assignee_email:$('fAssignee').value||null, status:$('fStatus').value, priority:$('fPriority').value, due_date:$('fDue').value||null, note:$('fNote').value.trim()||null };
+  var payload = { title:$('fTitle').value.trim(), assignees:pickedAssignees(), status:$('fStatus').value, priority:$('fPriority').value, due_date:$('fDue').value||null, note:$('fNote').value.trim()||null };
   $('dlgSave').disabled=true; $('dlgErr').hidden=true;
   var q = state.editing ? sb.from('tasks').update(payload).eq('id',state.editing.id).select().single() : sb.from('tasks').insert(payload).select().single();
   q.then(function(r){
