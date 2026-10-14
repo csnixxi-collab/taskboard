@@ -318,7 +318,7 @@ $('authForm').addEventListener('submit', function(e){
   var errEl=$('authErr'), okEl=$('authOk'); errEl.hidden=true; okEl.hidden=true; btn.disabled=true;
   var p;
   if (state.authMode==='signin') p = sb.auth.signInWithPassword({email:email,password:pw}).then(function(r){ if(r.error) throw r.error; });
-  else if (state.authMode==='signup') p = sb.auth.signUp({email:email,password:pw}).then(function(r){ if(r.error) throw r.error;
+  else if (state.authMode==='signup') p = sb.auth.signUp({email:email,password:pw,options:{emailRedirectTo:location.origin+location.pathname}}).then(function(r){ if(r.error) throw r.error;
       if (r.data.user && r.data.user.identities && r.data.user.identities.length===0) throw new Error('An account with this email already exists. Sign in instead, or use “Forgot password”.');
       if (!r.data.session){ okEl.textContent='Check your inbox for a confirmation email, then come back and sign in.'; okEl.hidden=false; state.authMode='signin'; setTimeout(renderAuth,4000); } });
   else if (state.authMode==='forgot') p = sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname}).then(function(r){ if(r.error) throw r.error; okEl.textContent='If that email is on the team, a reset link is on its way.'; okEl.hidden=false; });
