@@ -350,7 +350,7 @@ function boot(){
       state.me = q.data;
       $('whoami').textContent = state.me.name + (state.me.is_admin ? ' · admin' : '');
       $('teamTab').hidden = !state.me.is_admin;
-      if (!state.me.is_admin) { var tp=$('panel-team'); tp.parentNode.removeChild(tp); $('teamTab').parentNode.removeChild($('teamTab')); }
+      if (!state.me.is_admin) { var tp=$('panel-team'); if (tp) { tp.innerHTML=''; tp.hidden=true; } var tt=$('teamTab'); if (tt) tt.parentNode.removeChild(tt); }
       show('view-app');
       return loadAll();
     });
@@ -397,9 +397,10 @@ function visibleTasks(){
   return list;
 }
 function render(){
+  if (state.tab==='team' && !isAdmin()) state.tab='active';
   $('panel-tasks').hidden = state.tab==='team';
   $('panel-team').hidden = state.tab!=='team';
-  if (state.tab==='team'){ if(!isAdmin()){ state.tab='active'; $('panel-tasks').hidden=false; $('panel-team').hidden=true; } else { renderTeam(); return; } }
+  if (state.tab==='team'){ renderTeam(); return; }
   var archive = state.tab==='archive';
   var all = state.tasks.filter(function(t){ return archive ? t.status==='complete' : t.status!=='complete'; });
   $('pageTitle').textContent = archive ? 'Archive' : 'Active Tasks';
