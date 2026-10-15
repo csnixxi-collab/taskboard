@@ -350,6 +350,7 @@ function boot(){
       state.me = q.data;
       $('whoami').textContent = state.me.name + (state.me.is_admin ? ' · admin' : '');
       $('teamTab').hidden = !state.me.is_admin;
+      if (!state.me.is_admin) { var tp=$('panel-team'); tp.parentNode.removeChild(tp); $('teamTab').parentNode.removeChild($('teamTab')); }
       show('view-app');
       return loadAll();
     });
@@ -357,7 +358,7 @@ function boot(){
 }
 function loadAll(){
   return Promise.all([
-    sb.from('team_members').select('*').order('name'),
+    (isAdmin() ? sb.from('team_members').select('*') : sb.from('team_directory').select('*')).order('name'),
     sb.from('tasks').select('*').order('created_at',{ascending:false})
   ]).then(function(res){
     if (res[0].error) throw res[0].error; if (res[1].error) throw res[1].error;
@@ -370,6 +371,7 @@ document.addEventListener('visibilitychange', function(){ if(!document.hidden &&
 /* ---------- TABS ---------- */
 document.querySelector('.tabs').addEventListener('click', function(e){
   var b=e.target.closest('.tab'); if(!b) return;
+  if (b.dataset.tab==='team' && !isAdmin()) return;
   state.tab=b.dataset.tab; state.filter=null;
   document.querySelectorAll('.tab').forEach(function(t){ t.setAttribute('aria-selected', t===b?'true':'false'); });
   render();
@@ -397,7 +399,7 @@ function visibleTasks(){
 function render(){
   $('panel-tasks').hidden = state.tab==='team';
   $('panel-team').hidden = state.tab!=='team';
-  if (state.tab==='team'){ renderTeam(); return; }
+  if (state.tab==='team'){ if(!isAdmin()){ state.tab='active'; $('panel-tasks').hidden=false; $('panel-team').hidden=true; } else { renderTeam(); return; } }
   var archive = state.tab==='archive';
   var all = state.tasks.filter(function(t){ return archive ? t.status==='complete' : t.status!=='complete'; });
   $('pageTitle').textContent = archive ? 'Archive' : 'Active Tasks';
@@ -469,7 +471,7 @@ $('confirmYes').addEventListener('click', function(){
 /* ---------- DIALOG ---------- */
 function fillAssignees(sel){
   sel = sel||[];
-  $('fAssignees').innerHTML = state.members.filter(function(m){return m.active || sel.indexOf(m.email)>=0;}).map(function(m){
+  $('fAssignees').innerHTML = state.members.filter(function(m){return (m.active!==false) || sel.indexOf(m.email)>=0;}).map(function(m){
     return '<label class="pick"><input type="checkbox" value="'+esc(m.email)+'"'+(sel.indexOf(m.email)>=0?' checked':'')+'> '+esc(m.name)+(m.email===state.me.email?' (you)':'')+'</label>'; }).join('');
 }
 function pickedAssignees(){ return Array.prototype.map.call($('fAssignees').querySelectorAll('input:checked'), function(i){ return i.value; }); }
